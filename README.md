@@ -1,2 +1,42 @@
 # guitar-plugins
 Repo to save the plugins I've made over the years
+
+
+New_Project is a simple Gain I made for my gutiar
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
