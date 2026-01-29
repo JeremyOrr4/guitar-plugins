@@ -19,13 +19,27 @@ DisortionAudioProcessor::DisortionAudioProcessor()
                       #endif
                        .withOutput ("Output", juce::AudioChannelSet::stereo(), true)
                      #endif
-                       )
+                       ),
+       // INITIALIZE APVTS HERE
+       apvts(*this, nullptr, "Parameters", createParameters())
 #endif
 {
 }
 
 DisortionAudioProcessor::~DisortionAudioProcessor()
 {
+}
+
+// THIS DEFINES THE PARAMETERS (KNOBS)
+juce::AudioProcessorValueTreeState::ParameterLayout DisortionAudioProcessor::createParameters()
+{
+    std::vector<std::unique_ptr<juce::RangedAudioParameter>> params;
+
+    // ID, Name, Min, Max, Default
+    params.push_back(std::make_unique<juce::AudioParameterFloat>("drive", "Drive", 0.0f, 1.0f, 0.0f));
+    params.push_back(std::make_unique<juce::AudioParameterFloat>("volume", "Volume", 0.0f, 1.0f, 0.5f));
+
+    return { params.begin(), params.end() };
 }
 
 //==============================================================================
@@ -68,8 +82,7 @@ double DisortionAudioProcessor::getTailLengthSeconds() const
 
 int DisortionAudioProcessor::getNumPrograms()
 {
-    return 1;   // NB: some hosts don't cope very well if you tell them there are 0 programs,
-                // so this should be at least 1, even if you're not really implementing programs.
+    return 1;
 }
 
 int DisortionAudioProcessor::getCurrentProgram()
@@ -93,14 +106,10 @@ void DisortionAudioProcessor::changeProgramName (int index, const juce::String& 
 //==============================================================================
 void DisortionAudioProcessor::prepareToPlay (double sampleRate, int samplesPerBlock)
 {
-    // Use this method as the place to do any pre-playback
-    // initialisation that you need..
 }
 
 void DisortionAudioProcessor::releaseResources()
 {
-    // When playback stops, you can use this as an opportunity to free up any
-    // spare memory, etc.
 }
 
 #ifndef JucePlugin_PreferredChannelConfigurations
@@ -110,15 +119,10 @@ bool DisortionAudioProcessor::isBusesLayoutSupported (const BusesLayout& layouts
     juce::ignoreUnused (layouts);
     return true;
   #else
-    // This is the place where you check if the layout is supported.
-    // In this template code we only support mono or stereo.
-    // Some plugin hosts, such as certain GarageBand versions, will only
-    // load plugins that support stereo bus layouts.
     if (layouts.getMainOutputChannelSet() != juce::AudioChannelSet::mono()
      && layouts.getMainOutputChannelSet() != juce::AudioChannelSet::stereo())
         return false;
 
-    // This checks if the input layout matches the output layout
    #if ! JucePlugin_IsSynth
     if (layouts.getMainOutputChannelSet() != layouts.getMainInputChannelSet())
         return false;
@@ -129,39 +133,48 @@ bool DisortionAudioProcessor::isBusesLayoutSupported (const BusesLayout& layouts
 }
 #endif
 
+// DSP LOGIC GOES HERE
 void DisortionAudioProcessor::processBlock (juce::AudioBuffer<float>& buffer, juce::MidiBuffer& midiMessages)
 {
     juce::ScopedNoDenormals noDenormals;
     auto totalNumInputChannels  = getTotalNumInputChannels();
     auto totalNumOutputChannels = getTotalNumOutputChannels();
 
-    // In case we have more outputs than inputs, this code clears any output
-    // channels that didn't contain input data, (because these aren't
-    // guaranteed to be empty - they may contain garbage).
-    // This is here to avoid people getting screaming feedback
-    // when they first compile a plugin, but obviously you don't need to keep
-    // this code if your algorithm always overwrites all the output channels.
     for (auto i = totalNumInputChannels; i < totalNumOutputChannels; ++i)
         buffer.clear (i, 0, buffer.getNumSamples());
 
-    // This is the place where you'd normally do the guts of your plugin's
-    // audio processing...
-    // Make sure to reset the state if your inner loop is processing
-    // the samples and the outer loop is handling the channels.
-    // Alternatively, you can process the samples with the channels
-    // interleaved by keeping the same state.
+    // 1. Get parameter values
+    float currentDrive = *apvts.getRawParameterValue("drive");
+    float currentVol   = *apvts.getRawParameterValue("volume");
+
+    // Make the drive range more useful (1x gain to 50x gain)
+    float inputGain = 1.0f + (currentDrive * 50.0f);
+
     for (int channel = 0; channel < totalNumInputChannels; ++channel)
     {
         auto* channelData = buffer.getWritePointer (channel);
 
-        // ..do something to the data...
+        for (int sample = 0; sample < buffer.getNumSamples(); ++sample)
+        {
+            float in = channelData[sample];
+
+            // 2. Apply Drive
+            in *= inputGain;
+
+            // 3. Apply Soft Clipping (Distortion)
+            // std::tanh "squashes" the wave as it gets loud
+            float processed = std::tanh(in);
+
+            // 4. Apply Output Volume and store
+            channelData[sample] = processed * currentVol;
+        }
     }
 }
 
 //==============================================================================
 bool DisortionAudioProcessor::hasEditor() const
 {
-    return true; // (change this to false if you choose to not supply an editor)
+    return true;
 }
 
 juce::AudioProcessorEditor* DisortionAudioProcessor::createEditor()
@@ -172,19 +185,22 @@ juce::AudioProcessorEditor* DisortionAudioProcessor::createEditor()
 //==============================================================================
 void DisortionAudioProcessor::getStateInformation (juce::MemoryBlock& destData)
 {
-    // You should use this method to store your parameters in the memory block.
-    // You could do that either as raw data, or use the XML or ValueTree classes
-    // as intermediaries to make it easy to save and load complex data.
+    // Save user parameters
+    auto state = apvts.copyState();
+    std::unique_ptr<juce::XmlElement> xml (state.createXml());
+    copyXmlToBinary (*xml, destData);
 }
 
 void DisortionAudioProcessor::setStateInformation (const void* data, int sizeInBytes)
 {
-    // You should use this method to restore your parameters from this memory block,
-    // whose contents will have been created by the getStateInformation() call.
+    // Load user parameters
+    std::unique_ptr<juce::XmlElement> xmlState (getXmlFromBinary (data, sizeInBytes));
+    if (xmlState.get() != nullptr)
+        if (xmlState->hasTagName (apvts.state.getType()))
+            apvts.replaceState (juce::ValueTree::fromXml (*xmlState));
 }
 
 //==============================================================================
-// This creates new instances of the plugin..
 juce::AudioProcessor* JUCE_CALLTYPE createPluginFilter()
 {
     return new DisortionAudioProcessor();

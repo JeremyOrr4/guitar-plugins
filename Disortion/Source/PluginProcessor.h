@@ -53,10 +53,10 @@ public:
     void getStateInformation (juce::MemoryBlock& destData) override;
     void setStateInformation (const void* data, int sizeInBytes) override;
 
-private:
+    // Expose the APVTS to the Editor so we can attach sliders
     juce::AudioProcessorValueTreeState apvts;
-        
 
+private:
     juce::AudioProcessorValueTreeState::ParameterLayout createParameters();
         
     //==============================================================================

@@ -13,9 +13,33 @@
 DisortionAudioProcessorEditor::DisortionAudioProcessorEditor (DisortionAudioProcessor& p)
     : AudioProcessorEditor (&p), audioProcessor (p)
 {
-    // Make sure that before the constructor has finished, you've set the
-    // editor's size to whatever you need it to be.
     setSize (400, 300);
+
+    // --- DRIVE SLIDER ---
+    driveSlider.setSliderStyle(juce::Slider::Rotary);
+    driveSlider.setTextBoxStyle(juce::Slider::TextBoxBelow, false, 50, 20);
+    addAndMakeVisible(driveSlider);
+    
+    driveLabel.setText("Drive", juce::dontSendNotification);
+    driveLabel.setJustificationType(juce::Justification::centred);
+    driveLabel.attachToComponent(&driveSlider, false);
+    addAndMakeVisible(driveLabel);
+
+    // Link Drive Slider to APVTS "drive" parameter
+    driveAttachment = std::make_unique<juce::AudioProcessorValueTreeState::SliderAttachment>(audioProcessor.apvts, "drive", driveSlider);
+
+    // --- VOLUME SLIDER ---
+    volumeSlider.setSliderStyle(juce::Slider::Rotary);
+    volumeSlider.setTextBoxStyle(juce::Slider::TextBoxBelow, false, 50, 20);
+    addAndMakeVisible(volumeSlider);
+    
+    volumeLabel.setText("Volume", juce::dontSendNotification);
+    volumeLabel.setJustificationType(juce::Justification::centred);
+    volumeLabel.attachToComponent(&volumeSlider, false);
+    addAndMakeVisible(volumeLabel);
+
+    // Link Volume Slider to APVTS "volume" parameter
+    volumeAttachment = std::make_unique<juce::AudioProcessorValueTreeState::SliderAttachment>(audioProcessor.apvts, "volume", volumeSlider);
 }
 
 DisortionAudioProcessorEditor::~DisortionAudioProcessorEditor()
@@ -25,16 +49,19 @@ DisortionAudioProcessorEditor::~DisortionAudioProcessorEditor()
 //==============================================================================
 void DisortionAudioProcessorEditor::paint (juce::Graphics& g)
 {
-    // (Our component is opaque, so we must completely fill the background with a solid colour)
-    g.fillAll (getLookAndFeel().findColour (juce::ResizableWindow::backgroundColourId));
-
+    // Background Color
+    g.fillAll (juce::Colours::darkgrey);
+    
+    // Header Text
     g.setColour (juce::Colours::white);
-    g.setFont (juce::FontOptions (15.0f));
-    g.drawFittedText ("Hello World!", getLocalBounds(), juce::Justification::centred, 1);
+    g.setFont (24.0f);
+    g.drawFittedText ("Gemini Drive", getLocalBounds().removeFromTop(50), juce::Justification::centred, 1);
 }
 
 void DisortionAudioProcessorEditor::resized()
 {
-    // This is generally where you'll want to lay out the positions of any
-    // subcomponents in your editor..
+    // Layout the sliders
+    // x, y, width, height
+    driveSlider.setBounds(50, 100, 100, 100);
+    volumeSlider.setBounds(250, 100, 100, 100);
 }

@@ -25,9 +25,18 @@ public:
     void resized() override;
 
 private:
-    // This reference is provided as a quick way for your editor to
-    // access the processor object that created it.
     DisortionAudioProcessor& audioProcessor;
+
+    // UI Elements
+    juce::Slider driveSlider;
+    juce::Slider volumeSlider;
+    
+    juce::Label driveLabel;
+    juce::Label volumeLabel;
+
+    // Attachments (Connecting UI to Processor)
+    std::unique_ptr<juce::AudioProcessorValueTreeState::SliderAttachment> driveAttachment;
+    std::unique_ptr<juce::AudioProcessorValueTreeState::SliderAttachment> volumeAttachment;
 
     JUCE_DECLARE_NON_COPYABLE_WITH_LEAK_DETECTOR (DisortionAudioProcessorEditor)
 };
